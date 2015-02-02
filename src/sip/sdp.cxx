@@ -1091,12 +1091,16 @@ bool SDPAudioMediaDescription::PrintOn(ostream & str, const PString & connectStr
      what should be rare cases.
     */
 
+  PTRACE(2, "SDP\tm_offerPTime: " << m_offerPTime);
   if (m_offerPTime) {
     unsigned ptime = 0;
     for (SDPMediaFormatList::const_iterator format = formats.begin(); format != formats.end(); ++format) {
+      // PTRACE(2, "SDP\tformat: " << format);
       const OpalMediaFormat & mediaFormat = format->GetMediaFormat();
+      PTRACE(2, "SDP\tmedia format: " << mediaFormat);
       if (mediaFormat.HasOption(OpalAudioFormat::TxFramesPerPacketOption())) {
         unsigned ptime1 = mediaFormat.GetOptionInteger(OpalAudioFormat::TxFramesPerPacketOption()) * mediaFormat.GetFrameTime() / mediaFormat.GetTimeUnits();
+        PTRACE(2, "SDP\tptime1: " << ptime1);
         if (ptime < ptime1)
           ptime = ptime1;
       }
@@ -1104,6 +1108,8 @@ bool SDPAudioMediaDescription::PrintOn(ostream & str, const PString & connectStr
     if (ptime > 0)
       str << "a=ptime:" << ptime << "\r\n";
   }
+  else
+    str << "a=ptime: 20\r\n";   // LXK hard code ptime to 20 msecs for Verizon Certification
 
   unsigned largestFrameTime = 0;
   unsigned maxptime = UINT_MAX;
