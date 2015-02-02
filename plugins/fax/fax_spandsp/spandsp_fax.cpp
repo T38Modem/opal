@@ -205,7 +205,7 @@ static struct PluginCodec_Option const UseEcmOption =
   "Use-ECM",                  // Generic (human readable) option name
   false,                      // Read Only flag
   PluginCodec_OrMerge,        // Merge mode
-  "0",                        // Initial value
+  "1",                        // Initial value
   NULL,                       // SIP/SDP FMTP name
   NULL,                       // SIP/SDP FMTP default value (option not included in FMTP if have this value)
   0                           // H.245 Generic Capability number and scope bits
