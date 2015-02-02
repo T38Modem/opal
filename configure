@@ -4601,7 +4601,13 @@ fi
 
 WFLAGS=
 if test "x$ac_cv_c_compiler_gnu" = xyes; then
-  WFLAGS="-Wall -Wextra -Wstrict-aliasing -Wfloat-equal -Wno-comment -Wno-unused -Winit-self -Wno-missing-field-initializers"
+#  WFLAGS="-Wall -Wextra -Wstrict-aliasing -Wfloat-equal -Wno-comment -Wno-unused -Winit-self -Wno-missing-field-initializers"
+#  LXK Change:  Need to replace the line above with the following 4 lines that were deleted in rev 28381 so that our
+#  PPC GCC 3.4.6 will work for Manning. GCC 3.4.6 does not know no-missing-field-initializers.
+  WFLAGS="-Wall -Wextra -Wstrict-aliasing -Wfloat-equal -Wno-comment -Wno-unused"
+  if test ${GXX_MAJOR} -ge 4 ; then
+    WFLAGS="$WFLAGS -Winit-self -Wno-missing-field-initializers"
+  fi
 fi
 
 CFLAGS="$CFLAGS $WFLAGS"
