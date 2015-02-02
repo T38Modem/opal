@@ -585,11 +585,13 @@ void SIPURL::Sanitise(UsageContext context)
 #if OPAL_PTLIB_DNS
 PBoolean SIPURL::AdjustToDNS(PINDEX entry)
 {
+#if 0
   // RFC3263 states we do not do lookup if explicit port mentioned
   if (GetPortSupplied()) {
     PTRACE(4, "SIP\tNo SRV lookup as has explicit port number.");
     return true;
   }
+#endif
 
   // Or it is a valid IP address, not a domain name
   PIPSocket::Address ip = GetHostName();
@@ -2623,7 +2625,11 @@ OpalTransportAddress SIPDialogContext::GetRemoteTransportAddress() const
     return m_externalTransportAddress;
   }
 
-  OpalTransportAddress addr = m_proxy.GetHostAddress();
+  SIPURL proxy_uri;
+  proxy_uri = m_proxy;
+  proxy_uri.AdjustToDNS();
+  //OpalTransportAddress addr = m_proxy.GetHostAddress();
+  OpalTransportAddress addr = proxy_uri.GetHostAddress();
   if (!addr.IsEmpty()) {
     PTRACE(4, "SIP\tRemote dialog address proxied: " << addr);
     return addr;

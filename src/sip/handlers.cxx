@@ -313,8 +313,10 @@ OpalTransport * SIPHandler::GetTransport()
   }
 
   SIPURL url;
-  if (!m_proxy.IsEmpty())
+  if (!m_proxy.IsEmpty()) {
     url = m_proxy;
+    url.AdjustToDNS();
+  }
   else {
     url = m_remoteAddress;
     url.AdjustToDNS();
