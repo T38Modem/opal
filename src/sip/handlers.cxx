@@ -315,11 +315,11 @@ OpalTransport * SIPHandler::GetTransport()
   SIPURL url;
   if (!m_proxy.IsEmpty()) {
     url = m_proxy;
-    url.AdjustToDNS();
+    url.AdjustToDNS(endpoint);
   }
   else {
     url = m_remoteAddress;
-    url.AdjustToDNS();
+    url.AdjustToDNS(endpoint);
   }
 
   PString localInterface = remoteParams(OPAL_INTERFACE_PARAM);
@@ -385,6 +385,7 @@ bool SIPHandler::WriteSIPHandler(OpalTransport & transport, bool forked)
     m_authentication->Authorise(auth); // If already have info from last time, use it!
   }
 
+  PTRACE(2, "SIP\tStarting transaction on " << transport);
   if (transaction->Start()) {
     m_transactions.Append(transaction);
     return true;
@@ -591,6 +592,7 @@ void SIPHandler::OnExpireTimeout(PTimer &, INT)
 
     case Unavailable :
       PTRACE(2, "SIP\tStarting " << GetMethod() << " for offline retry");
+      m_addressOfRecord.TryNextSRV(endpoint);
       if (SendRequest(Restoring))
         return;
       break;

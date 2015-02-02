@@ -1595,14 +1595,14 @@ PBoolean SIPConnection::SetUpConnection()
   else if (!m_dialog.GetProxy().IsEmpty()) {
     SIPURL proxy_url;
     proxy_url = m_dialog.GetProxy();
-    proxy_url.AdjustToDNS();
+    proxy_url.AdjustToDNS(endpoint);
     //transportAddress = m_dialog.GetProxy().GetHostAddress();
     transportAddress = proxy_url.GetHostAddress();
     PTRACE(4, "SIP\tConnecting to (with proxy)" << m_dialog.GetRequestURI() << " via " << transportAddress);
   }
   else {
     transportAddress = m_dialog.GetRequestURI();
-    transportAddress.AdjustToDNS(); // Do a DNS SRV lookup
+    transportAddress.AdjustToDNS(endpoint); // Do a DNS SRV lookup
     PTRACE(4, "SIP\tConnecting to " << m_dialog.GetRequestURI() << " via " << transportAddress);
   }
 

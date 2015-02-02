@@ -56,11 +56,88 @@
 
 class SIPRegisterHandler;
 
-
 //
 //  provide flag so applications know if presence is available
 //
 #define OPAL_HAS_SIP_PRESENCE   1
+
+
+class SRVINDEX : public PObject
+{
+  public:
+    SRVINDEX(SIPURL url) : m_index(1) { PTRACE(5,"SIP\tSVRINDEX() " << url); m_url = url; }
+    PINDEX GetIndex() { PTRACE(5, "SIP\tGetIndex " << m_index << " " << m_url); return m_index; }
+    SIPURL & GetSIPURL() { PTRACE(5, "SIP\tGetSIPURL " << m_index << " " << m_url); return m_url; }
+    void ResetIndex() { PTRACE(5,"SIP\tResetIndex() " << m_index << " " << m_url); m_index = 0; }
+    void IncrementIndex() { PTRACE(5,"SIP\tIncrementIndex() " << m_index << " " << m_url); ++m_index; }
+  private:
+    SIPURL m_url;
+    PINDEX m_index;
+};
+
+class SRVIndexFinder : public PObject
+{
+  public:
+    PINDEX GetIndex(SIPURL url) 
+      {
+        PINDEX i;
+        mutex.Wait();
+        PTRACE(4, "SIP\tSRVIndexFinder::GetIndex: " << url << " " << url.GetHostName());
+        for (i=0;i<SRVIndexList.GetSize();i++) {
+          SIPURL & Found_url = SRVIndexList[i].GetSIPURL();
+          PTRACE(4, "SIP\tSRVIndexFinder::GetIndex: " << i << " " << Found_url << " " << Found_url.GetHostName());
+          if (SRVIndexList[i].GetSIPURL().GetHostName().Compare(Found_url.GetHostName()) == SIPURL::EqualTo) {
+            PTRACE(4, "SIP\tSRVIndexFinder::GetIndex: Found it, returning " << SRVIndexList[i].GetIndex());
+            mutex.Signal();
+            return SRVIndexList[i].GetIndex();
+          }
+        }
+        PTRACE(4, "SIP\tSRVIndexFinder::GetIndex: Not found so SRVIndex of 0...");
+        mutex.Signal();
+        return 0;
+      }
+    void ResetIndex(SIPURL url)
+      {
+        PINDEX i;
+        mutex.Wait();
+        PTRACE(4, "SIP\tSRVIndexFinder::ResetIndex: " << url << " " << url.GetHostName());
+        for (i=0;i<SRVIndexList.GetSize();i++) {
+          SIPURL & Found_url = SRVIndexList[i].GetSIPURL();
+          PTRACE(4, "SIP\tSRVIndexFinder::ResetIndex: " << i << " " << Found_url << " " << Found_url.GetHostName());
+          if (SRVIndexList[i].GetSIPURL().GetHostName().Compare(Found_url.GetHostName()) == SIPURL::EqualTo) {
+            PTRACE(4, "SIP\tSRVIndexFinder::ResetIndex: Found it, deleteing...");
+            SRVINDEX *p = &SRVIndexList[i];
+            SRVIndexList.RemoveAt(i);
+            mutex.Signal();
+            return;
+          }
+        }
+        mutex.Signal();
+      }
+    void IncrementIndex(SIPURL url)
+      {
+        PINDEX i;
+        mutex.Wait();
+        PTRACE(4, "SIP\tSRVIndexFinder::IncrementIndex: " << url << " " << url.GetHostName());
+        for (i=0;i<SRVIndexList.GetSize();i++) {
+          SIPURL & Found_url = SRVIndexList[i].GetSIPURL();
+          PTRACE(4, "SIP\tSRVIndexFinder::IncrementIndex: " << i << " " << Found_url << " " << Found_url.GetHostName());
+          if (SRVIndexList[i].GetSIPURL().GetHostName().Compare(Found_url.GetHostName()) == SIPURL::EqualTo) {
+            PTRACE(4, "SIP\tSRVIndexFinder::IncrementIndex: Found it, incrementing to " << SRVIndexList[i].GetIndex()+1);
+            SRVIndexList[i].IncrementIndex();
+            mutex.Signal();
+            return;
+          }
+        }
+        PTRACE(4, "SIP\tSRVIndexFinder::IncrementIndex: Not found so adding with SRVIndex of 1...");
+        PINDEX j = SRVIndexList.Append(new SRVINDEX(url));
+        PTRACE(4, "SIP\tSRVIndexFinder::IncrementIndex: j = " << j << " Size = " << SRVIndexList.GetSize());
+        mutex.Signal();
+      }
+    PList<SRVINDEX> SRVIndexList;
+    PMutex mutex;
+};
+
 
 /////////////////////////////////////////////////////////////////////////
 
@@ -983,6 +1060,8 @@ class SIPEndPoint : public OpalRTPEndPoint
 
     void UpdateHandlerIndexes(SIPHandler * handler) { activeSIPHandlers.Update(handler); }
 
+    SRVIndexFinder SRVIndex;
+
   protected:
     PDECLARE_NOTIFIER(PThread, SIPEndPoint, TransportThreadMain);
     PDECLARE_NOTIFIER(PTimer, SIPEndPoint, NATBindingRefresh);
@@ -1080,7 +1159,6 @@ class SIPEndPoint : public OpalRTPEndPoint
     P_REMOVE_VIRTUAL_VOID(OnReceivedOK(SIPTransaction &, SIP_PDU &));
     P_REMOVE_VIRTUAL_VOID(OnMessageFailed(const SIPURL &, SIP_PDU::StatusCodes));
 };
-
 
 #endif // OPAL_SIP
 

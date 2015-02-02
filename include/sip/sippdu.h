@@ -192,9 +192,13 @@ class SIPURL : public PURL
         @return FALSE if DNS is available but entry is larger than last SRV record entry,
                 TRUE if DNS lookup fails or no DNS is available
       */
-    PBoolean AdjustToDNS(
-      PINDEX entry = 0  /// Entry in the SRV record to adjust to
+    PBoolean AdjustToDNSe(
+      PINDEX entry  /// Entry in the SRV record to adjust to
     );
+
+    PBoolean AdjustToDNS(SIPEndPoint & ep);
+
+    PBoolean TryNextSRV(SIPEndPoint & ep);
 
     /// Generate a unique string suitable as a dialog tag
     static PString GenerateTag();
@@ -782,7 +786,7 @@ class SIPDialogContext
              !m_remoteTag.IsEmpty();
     }
 
-    OpalTransportAddress GetRemoteTransportAddress() const;
+    OpalTransportAddress GetRemoteTransportAddress(SIPEndPoint &) const;
 
     void SetForking(bool f) { m_forking = f; }
 

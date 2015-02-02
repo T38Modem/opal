@@ -583,7 +583,28 @@ void SIPURL::Sanitise(UsageContext context)
 
 
 #if OPAL_PTLIB_DNS
-PBoolean SIPURL::AdjustToDNS(PINDEX entry)
+PBoolean SIPURL::TryNextSRV(SIPEndPoint & ep)
+{
+  SIPURL mySIPURL;
+
+  PTRACE(4, "SIP\tTryNextSRV: " << *this);
+  ep.SRVIndex.IncrementIndex(*this);
+  mySIPURL = *this;         // make copy of *this so we do not mess with it
+  return mySIPURL.AdjustToDNSe(ep.SRVIndex.GetIndex(*this));
+}
+
+PBoolean SIPURL::AdjustToDNS(SIPEndPoint & ep)
+{
+  PTRACE(4, "SIP\tAdjustToDNS: " << *this);
+  if (!AdjustToDNSe(ep.SRVIndex.GetIndex(*this))) {
+    PTRACE(4, "SIP\tAdjustToDNS Failed -- trying again with SRV 0");
+    ep.SRVIndex.ResetIndex(*this);
+    return AdjustToDNSe(0);
+  }
+  return true;
+}
+
+PBoolean SIPURL::AdjustToDNSe(PINDEX entry)
 {
 #if 0
   // RFC3263 states we do not do lookup if explicit port mentioned
@@ -593,10 +614,13 @@ PBoolean SIPURL::AdjustToDNS(PINDEX entry)
   }
 #endif
 
+  PTRACE(4, "SIP\t AdjustToDNSe(" << entry << ")");
   // Or it is a valid IP address, not a domain name
   PIPSocket::Address ip = GetHostName();
-  if (ip.IsValid())
+  if (ip.IsValid()) {
+    PTRACE(4, "SIP\t AdjustToDNSe(" << entry << ") IP is valid: " << ip);
     return true;
+  }
 
   // Do the SRV lookup, if fails, then we actually return TRUE so outer loops
   // can use the original host name value.
@@ -620,7 +644,11 @@ PBoolean SIPURL::AdjustToDNS(PINDEX entry)
   return true;
 }
 #else
-PBoolean SIPURL::AdjustToDNS(PINDEX)
+void SIPURL::TryNextSRV(SIPEndPoint &)
+{
+}
+
+PBoolean SIPURL::AdjustToDNS(SIPEndPoint &)
 {
   return true;
 }
@@ -2616,7 +2644,7 @@ bool SIPDialogContext::IsDuplicateCSeq(unsigned requestCSeq)
 }
 
 
-OpalTransportAddress SIPDialogContext::GetRemoteTransportAddress() const
+OpalTransportAddress SIPDialogContext::GetRemoteTransportAddress(SIPEndPoint & ep) const
 {
   // In order of priority ...
 
@@ -2625,9 +2653,10 @@ OpalTransportAddress SIPDialogContext::GetRemoteTransportAddress() const
     return m_externalTransportAddress;
   }
 
+  PTRACE(4, "SIP\tGetRemoteTransportAddress " << m_proxy);
   SIPURL proxy_uri;
   proxy_uri = m_proxy;
-  proxy_uri.AdjustToDNS();
+  proxy_uri.AdjustToDNS(ep);
   //OpalTransportAddress addr = m_proxy.GetHostAddress();
   OpalTransportAddress addr = proxy_uri.GetHostAddress();
   if (!addr.IsEmpty()) {
@@ -2646,7 +2675,8 @@ OpalTransportAddress SIPDialogContext::GetRemoteTransportAddress() const
   }
 
 
-  uri.AdjustToDNS();
+  PTRACE(4, "SIP\tGetRemoteTransportAddress 2 " << uri);
+  uri.AdjustToDNS(ep);
   return uri.GetHostAddress();
 }
 
@@ -2680,7 +2710,7 @@ SIPTransaction::SIPTransaction(Methods meth, SIPConnection & conn)
   , m_retryTimeoutMax(m_endpoint.GetRetryTimeoutMax())
   , m_state(NotStarted)
   , m_retry(1)
-  , m_remoteAddress(conn.GetDialog().GetRemoteTransportAddress())
+  , m_remoteAddress(conn.GetDialog().GetRemoteTransportAddress(conn.GetEndPoint()))
 {
   PAssert(m_connection != NULL, "Transaction created on connection pending deletion.");
 
@@ -2772,7 +2802,7 @@ PBoolean SIPTransaction::Start()
       destination = routeSet.front();
 
     // Do a DNS SRV lookup
-    destination.AdjustToDNS();
+    destination.AdjustToDNS(m_endpoint);
     m_remoteAddress = destination.GetHostAddress();
   }
 
@@ -2961,8 +2991,23 @@ void SIPTransaction::OnRetry(PTimer &, INT)
   m_retry++;
 
   if (m_retry >= m_endpoint.GetMaxRetries()) {
+    PTRACE(3, "SIP\tMax Retries (" << m_retry << ") on " << m_remoteAddress);
     SetTerminated(Terminated_RetriesExceeded);
     return;
+  }
+
+  PTRACE(3, "SIP\tOnRetry: m_retry: " << m_retry << " m_uri: " << m_uri << " m_connection: " << m_connection);
+  PTRACE(3, "SIP\tOnRetry: m_transport.GetRemoteAddress(): " << m_transport.GetRemoteAddress());
+  if (m_retry >= 4) {
+    if (m_uri.TryNextSRV(m_endpoint)) {
+      SIPURL mySIPURL = m_uri;          // use a copy to not mess with m_uri
+      mySIPURL.AdjustToDNS(m_endpoint);
+      PTRACE(3, "SIP\tOnRetry: " << mySIPURL.GetHostName() << " " << mySIPURL.GetPort() << " " << "udp");
+      OpalTransportAddress myOpalTransAddr(mySIPURL.GetHostName(),mySIPURL.GetPort(),"udp");
+      m_remoteAddress = myOpalTransAddr;
+      PTRACE(3, "SIP\tSwtitching to next SRV record: " << m_remoteAddress);
+      m_retry = 0;
+    }
   }
 
   if (m_state > Trying)
@@ -3296,7 +3341,7 @@ PBoolean SIPInvite::OnReceivedResponse(SIP_PDU & response)
         if (!m_connection->LockReadOnly())
           return false;
 
-        m_remoteAddress = m_connection->GetDialog().GetRemoteTransportAddress();
+        m_remoteAddress = m_connection->GetDialog().GetRemoteTransportAddress(m_endpoint);
         if (m_transport.GetLocalAddress().IsCompatible(m_remoteAddress))
           PTRACE(4, "SIP\tTransaction remote address changed to " << m_remoteAddress);
         else {
