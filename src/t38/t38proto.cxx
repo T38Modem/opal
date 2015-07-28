@@ -401,7 +401,16 @@ class T38PseudoRTP_Handler : public RTP_Encoding
 
       // Decode the PDU, but not if still receiving RTP
       bool decodeBad = !m_receivedPacket.Decode(rawData);
-      if (decodeBad || (m_awaitingGoodPacket && m_receivedPacket.m_seq_number >= 32768)) {
+      // LXK Change to solve the Cisco CUBE bug of starting with UDPTL Sequence Number of 32768.
+      // The T.38 Recommendation requires the first UDPTL packet to have a Sequence Number of 0.
+      // Previously we ignored packets with sequence numbers >= 32768. Now we only ignore packets 
+      // with sequence numbers of 32768 (0x8000 PCMU identifier) or 32776 (0x8008 PCMA identifier). 
+      // (We only support the PCMU and PCMA codecs to start a call.) All others are accepted, so 
+      // once the CUBE  moves to 32769, we have only missed the first UDPTL packet and we are OK.
+      if (decodeBad || 
+             (m_awaitingGoodPacket && 
+                 (m_receivedPacket.m_seq_number == 0x8000 ||    // PCMU first two bytes 
+                  m_receivedPacket.m_seq_number == 0x8008))) {  // PCMA first two bytes
         if (++m_consecutiveBadPackets > 1000) {
           PTRACE(1, "T38_UDPTL\tRaw data decode failed 1000 times, remote probably not switched from audio, aborting!");
           return RTP_Session::e_AbortTransport;
