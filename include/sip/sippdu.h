@@ -834,6 +834,7 @@ struct SIPParameters
   unsigned        m_restoreTime;
   PTimeInterval   m_minRetryTime;
   PTimeInterval   m_maxRetryTime;
+  bool            m_retry403;
   void          * m_userData;
 };
 

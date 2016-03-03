@@ -115,6 +115,7 @@ public:
   virtual void OnReceivedResponse(SIPTransaction & transaction, SIP_PDU & response);
   virtual void OnReceivedIntervalTooBrief(SIPTransaction & transaction, SIP_PDU & response);
   virtual void OnReceivedTemporarilyUnavailable(SIPTransaction & transaction, SIP_PDU & response);
+  virtual void OnReceivedForbidden(SIPTransaction & transaction, SIP_PDU & response);
   virtual void OnReceivedAuthenticationRequired(SIPTransaction & transaction, SIP_PDU & response);
   virtual void OnReceivedOK(SIPTransaction & transaction, SIP_PDU & response);
   virtual void OnTransactionFailed(SIPTransaction & transaction);
@@ -169,6 +170,7 @@ protected:
   PTimer                      m_expireTimer; 
   SIPURL                      m_proxy;
   OpalProductInfo             m_productInfo;
+  bool                        m_retry403;
 
   // Keep a copy of the keys used for easy removal on destruction
   typedef std::map<PString, PSafePtr<SIPHandler> > IndexMap;

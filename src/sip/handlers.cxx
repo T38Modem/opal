@@ -92,6 +92,7 @@ SIPHandler::SIPHandler(SIP_PDU::Methods method, SIPEndPoint & ep, const SIPParam
   , m_state(Unavailable)
   , m_receivedResponse(false)
   , m_proxy(params.m_proxyAddress)
+  , m_retry403(params.m_retry403)
 {
   m_transactions.DisallowDeleteObjects();
   m_expireTimer.SetNotifier(PCREATE_NOTIFIER(OnExpireTimeout));
@@ -448,6 +449,10 @@ void SIPHandler::OnReceivedResponse(SIPTransaction & transaction, SIP_PDU & resp
       OnReceivedTemporarilyUnavailable(transaction, response);
       break;
 
+    case SIP_PDU::Failure_Forbidden:
+      OnReceivedForbidden(transaction, response);
+      break;
+
     default :
       if (responseClass == 2)
         OnReceivedOK(transaction, response);
@@ -465,6 +470,16 @@ void SIPHandler::OnReceivedIntervalTooBrief(SIPTransaction & /*transaction*/, SI
 
   // Restart the transaction with new authentication handler
   SendRequest(GetState());
+}
+
+
+void SIPHandler::OnReceivedForbidden(SIPTransaction & /*transaction*/, SIP_PDU & response)
+{
+  OnFailed(SIP_PDU::Failure_Forbidden);
+  if (m_retry403) {
+    PTRACE(2, "SIP\tRetrying on 403 Forbidden (in violation of RFC 3261) on " << m_transport);
+    RetryLater(response.GetMIME().GetInteger("Retry-After", m_offlineExpireTime));
+  }
 }
 
 
@@ -566,6 +581,14 @@ void SIPHandler::OnFailed(SIP_PDU::StatusCodes code)
         SetState(Unavailable);
         break;
       }
+    case SIP_PDU::Failure_Forbidden:
+      if (m_retry403) {
+        if (GetState() != Unsubscribing) {
+          SetState(Unavailable);
+          break;
+        }
+      }
+
       // Do next case to finalise Unsubscribe even though there was an error
 
     default :
