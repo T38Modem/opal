@@ -433,6 +433,14 @@ PBoolean OpalInternalIPTransport::GetIpAndPort(const OpalTransportAddress & addr
     if (PIPSocket::GetHostAddress(host, ip))
       return true;
     PTRACE(1, "Opal\tCould not find host \"" << host << '"');
+    // In this case the Version may be 0 which will cause problems later on
+    // so here we fix it by calling GetAny(4)
+    if (ip.GetVersion() == 0) {
+      PTRACE(3, "OpalIP\tOpalInternalIPTransport IP Address version is 0, so fixing");
+      ip = PIPSocket::Address::GetAny(4);
+      PTRACE(3, "OpalIP\tOpalInternalIPTransport new IP Address and version: "
+             << ip.AsString(true) << " - " << ip.GetVersion());
+    }
   }
   else {
     if (ip.FromString(device))

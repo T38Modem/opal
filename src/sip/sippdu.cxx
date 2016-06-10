@@ -590,7 +590,7 @@ PBoolean SIPURL::TryNextSRV(SIPEndPoint & ep)
   PTRACE(4, "SIP\tTryNextSRV: " << *this);
   ep.SRVIndex.IncrementIndex(*this);
   mySIPURL = *this;         // make copy of *this so we do not mess with it
-  return mySIPURL.AdjustToDNSe(ep.SRVIndex.GetIndex(*this));
+  return mySIPURL.AdjustToDNS(ep);
 }
 
 PBoolean SIPURL::AdjustToDNS(SIPEndPoint & ep)
