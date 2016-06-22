@@ -2600,7 +2600,15 @@ void SIPDialogContext::Update(OpalTransport & transport, const SIP_PDU & pdu)
 
   /* Update the local/remote fields */
   if (pdu.GetMethod() == SIP_PDU::NumMethods) {
-    SetRemoteURI(mime.GetTo());
+    /* LXK -- Sotel Systems sends 100 Trying with a To: field tag just before sending 
+     * 401 Unauthorized. This causes us to save this tag and use it again on the
+     * ensuing invite. This is bad and is rejected. Here we check for Trying and do
+     * not save away the tag in that case.
+     */
+    if (pdu.GetStatusCode() == 100)
+      PTRACE(4, "SIP\tNot updating To: field from 100 Trying response");
+    else
+      SetRemoteURI(mime.GetTo());
     SetLocalURI(mime.GetFrom());
   }
   else {
